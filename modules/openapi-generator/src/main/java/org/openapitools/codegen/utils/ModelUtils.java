@@ -2681,7 +2681,8 @@ public class ModelUtils {
      * @return The simplified schema
      */
     public static Schema simplifyOneOfAnyOfWithOnlyOneNonNullSubSchema(OpenAPI openAPI, Schema schema, List<Schema> subSchemas) {
-        if (subSchemas.removeIf(subSchema -> isNullTypeSchema(openAPI, subSchema))) {
+        boolean removedNullBranch = subSchemas.removeIf(subSchema -> isNullTypeSchema(openAPI, subSchema));
+        if (removedNullBranch) {
             schema.setNullable(true);
         }
 
@@ -2694,8 +2695,9 @@ public class ModelUtils {
                 subSchema = cloneSchema(subSchema,
                         openAPI != null && SpecVersion.V31.equals(openAPI.getSpecVersion()));
             }
-            // Preserve parent-level docs when nullable anyOf/oneOf collapses to a single child schema.
-            if (subSchema.getDescription() == null && schema.getDescription() != null) {
+            // Only preserve the parent description for the nullable-union case;
+            // otherwise it re-triggers normalizeReferenceSchema's allOf wrapping.
+            if (removedNullBranch && subSchema.getDescription() == null && schema.getDescription() != null) {
                 subSchema.setDescription(schema.getDescription());
             }
             if (Boolean.TRUE.equals(schema.getNullable())) { // retain nullable setting

@@ -729,6 +729,35 @@ public class ModelUtilsTest {
     }
 
     @Test
+    public void simplifyOneOfAnyOfWithOnlyOneNonNullSubSchemaDoesNotCopyDescriptionWithoutNullBranch() {
+        // A oneOf/anyOf with a single sub-schema and no null branch to drop must collapse to a
+        // plain alias of that sub-schema. Copying the parent description onto it turns the
+        // collapsed schema into a "$ref with siblings", which OpenAPINormalizer#normalizeReferenceSchema
+        // then wraps back into an allOf, defeating the simplification entirely.
+        OpenAPI openAPI = new OpenAPI();
+
+        Schema oneOfParent = new Schema().description("A shape to draw.");
+        Schema childRef = new Schema<>().$ref("#/components/schemas/Circle");
+        oneOfParent.setOneOf(new ArrayList<>(List.of(childRef)));
+        Schema simplified = ModelUtils.simplifyOneOfAnyOfWithOnlyOneNonNullSubSchema(
+                openAPI, oneOfParent, oneOfParent.getOneOf());
+
+        assertNull(simplified.getOneOf());
+        assertEquals(simplified.get$ref(), "#/components/schemas/Circle");
+        assertNull(simplified.getDescription());
+
+        Schema anyOfParent = new Schema().description("A shape to draw.");
+        Schema anyOfChildRef = new Schema<>().$ref("#/components/schemas/Circle");
+        anyOfParent.setAnyOf(new ArrayList<>(List.of(anyOfChildRef)));
+        Schema anyOfSimplified = ModelUtils.simplifyOneOfAnyOfWithOnlyOneNonNullSubSchema(
+                openAPI, anyOfParent, anyOfParent.getAnyOf());
+
+        assertNull(anyOfSimplified.getAnyOf());
+        assertEquals(anyOfSimplified.get$ref(), "#/components/schemas/Circle");
+        assertNull(anyOfSimplified.getDescription());
+    }
+
+    @Test
     public void isNullTypeSchemaTest() {
         OpenAPI openAPI = TestUtils.parseSpec("src/test/resources/3_0/null_schema_test.yaml");
         Map<String, String> options = new HashMap<>();
